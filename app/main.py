@@ -66,6 +66,7 @@ def render_main_app():
             menu_options.append("EDA (Análisis Exploratorio)")
             menu_options.append("Fase 5: Evaluación de Modelos")
             menu_options.append("Fase 6: Despliegue (Producción)")
+            menu_options.append("Reportes Profesionales")
             
         selection = st.radio("Navegación", menu_options)
         st.divider()
@@ -96,6 +97,10 @@ def render_main_app():
     elif selection == "Fase 6: Despliegue (Producción)":
         from app.components.deployment_view import render_deployment
         render_deployment()
+        
+    elif selection == "Reportes Profesionales":
+        from app.components.reports_view import render_reports
+        render_reports()
 
 if __name__ == "__main__":
     # Ruteo principal basado en el estado de la sesión
