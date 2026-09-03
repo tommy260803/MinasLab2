@@ -41,11 +41,9 @@ def train_xgboost(X_train, y_train, X_val, y_val, random_state=42):
         scale_pos_weight=scale_weight,
         random_state=random_state,
         eval_metric='auc',
-        early_stopping_rounds=20,
         n_jobs=-1
     )
-    # Se utiliza Early Stopping evaluando contra el set de validación
-    model.fit(X_train, y_train, eval_set=[(X_val, y_val)], verbose=False)
+    model.fit(X_train, y_train, verbose=False)
     return model
 
 def train_svm(X_train, y_train, random_state=42):

@@ -1,15 +1,13 @@
 app:
-  name: "Sistema de Mantenimiento Predictivo"
-  version: "1.0.0"
+  name: Sistema de Mantenimiento Predictivo
   port: 8501
-
+  version: 1.0.0
 database:
   host: ${DB_HOST}
+  name: ${DB_NAME}
+  password: postgres
   port: ${DB_PORT}
   user: ${DB_USER}
-  password: ${DB_PASSWORD}
-  name: ${DB_NAME}
-
 security:
-  jwt_secret: ${JWT_SECRET}
   jwt_expiration_hours: 24
+  jwt_secret: ${JWT_SECRET}
