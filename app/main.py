@@ -68,29 +68,14 @@ def render_main_app():
 
     st.title("📊 Panel de Control (Dashboard)")
     
-    # Ejemplo de protección RBAC en la interfaz
+    # Panel Principal protegido con RBAC
     try:
         # Se verifica si tiene permiso para ver el dashboard
         require_permission("view_dashboard")
         
-        st.success("¡Bienvenido al sistema! Tienes acceso a esta sección.")
-        
-        # Registrar acceso al módulo principal de forma silenciosa
-        if not st.session_state.get("dashboard_logged"):
-            log_action(user["id"], "ACCESS_MODULE", details="Acceso al módulo: Dashboard")
-            st.session_state["dashboard_logged"] = True
-            
-        col1, col2 = st.columns(2)
-        with col1:
-            st.info("Aquí irán las métricas principales (KPIs) de los equipos.")
-        with col2:
-            if "run_models" in st.session_state["permissions"]:
-                st.warning("🤖 Tienes permiso especial para ejecutar modelos IA.")
-                if st.button("Ejecutar Modelo Predictivo"):
-                    log_action(user["id"], "RUN_AI_MODEL", details="Ejecución manual de predicción IA")
-                    st.toast("Modelo ejecutado exitosamente.")
-            else:
-                st.write("No tienes permisos para ejecutar modelos IA.")
+        # Importamos e instanciamos el módulo del dashboard
+        from app.components.dashboard_view import render_dashboard
+        render_dashboard()
                 
     except st.runtime.scriptrunner.StopException:
         # StopException es lanzado por st.stop() en require_permission
