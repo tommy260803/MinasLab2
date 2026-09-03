@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Entornos virtuales
+venv/
+env/
+ENV/
+.venv/
+
+# Configuración local
+.env
+config_local.yaml
+
+# Datos locales (no versionar datos pesados o sensibles)
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/models/*
+!data/models/.gitkeep
+
+# IDEs y SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
