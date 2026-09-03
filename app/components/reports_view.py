@@ -8,6 +8,10 @@ from core.db_manager import engine
 from core.audit_logger import log_action
 from core.permissions import require_permission
 from core.report_generator import generate_pdf, generate_word, generate_excel
+from app.components.ui_styles import (
+    page_header, section_header, render_styled_table,
+    card_container_begin, card_container_end
+)
 
 def get_report_data(report_type, start_date, end_date):
     """Extrae los datos desde PostgreSQL según el tipo de reporte solicitado."""
@@ -49,58 +53,72 @@ def generate_dynamic_plot(df, report_type):
     if df.empty: return None
     
     if report_type == "Auditoría de Accesos":
-        return px.pie(df, names='accion', title='Distribución de Acciones en el Sistema', hole=0.3)
+        fig = px.pie(df, names='accion', title='Distribución de Acciones en el Sistema', hole=0.3)
+        fig.update_layout(margin=dict(l=0, r=0, t=40, b=0))
+        return fig
     elif report_type == "Estado de Mantenimientos":
-        return px.bar(df, x='equipo', color='tipo', title='Mantenimientos por Equipo y Tipo')
+        fig = px.bar(df, x='equipo', color='tipo', title='Mantenimientos por Equipo y Tipo')
+        fig.update_layout(margin=dict(l=0, r=0, t=40, b=0))
+        return fig
     elif report_type == "Historial de Predicciones AI":
-        return px.line(df, x='fecha', y='probabilidad_riesgo', color='equipo', title='Evolución del Riesgo de Falla')
+        fig = px.line(df, x='fecha', y='probabilidad_riesgo', color='equipo', title='Evolución del Riesgo de Falla')
+        fig.update_layout(margin=dict(l=0, r=0, t=40, b=0))
+        return fig
     
     return None
 
 def render_reports():
     user = st.session_state["user"]
-    require_permission("view_dashboard") # Se asume que roles altos (Admin/Analista) tienen este permiso
+    require_permission("view_dashboard")
     
     if not st.session_state.get("reports_loaded_log"):
         log_action(user["id"], "VIEW_REPORTS", details="Acceso a Módulo de Reportes Profesionales")
         st.session_state["reports_loaded_log"] = True
 
-    st.title("📄 Generador de Reportes Profesionales")
-    st.markdown("Exporta la inteligencia de negocio y auditoría a formatos **PDF**, **Word (.docx)** o **Excel (.xlsx)**.")
+    page_header("Centro de Reportes", "Generación de informes ejecutivos y operativos")
+    st.markdown("<p style='color: #94A3B8; font-size: 14px;'>Exporte la inteligencia de negocio y registros de auditoría a formatos estandarizados.</p>", unsafe_allow_html=True)
     
     # 1. Filtros UI
+    card_container_begin()
+    st.markdown("<div style='font-size: 14px; font-weight: 600; color: #94A3B8; text-transform: uppercase; margin-bottom: 12px;'>Parámetros del Reporte</div>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns(3)
     with col1:
         report_types = ["Auditoría de Accesos", "Estado de Mantenimientos", "Historial de Predicciones AI"]
-        report_type = st.selectbox("Tipo de Reporte", report_types)
+        report_type = st.selectbox("Clasificación del Informe", report_types)
     with col2:
         start_date = st.date_input("Fecha Inicio", value=pd.to_datetime('2023-01-01'))
     with col3:
         end_date = st.date_input("Fecha Fin", value=datetime.today())
         
-    export_format = st.radio("Formato de Exportación", ["PDF", "Word (.docx)", "Excel (.xlsx)"], horizontal=True)
+    export_format = st.radio("Formato de Exportación", ["PDF Documento Ejecutivo", "Word (.docx) Editable", "Excel (.xlsx) Datos Crudos"], horizontal=True)
+    card_container_end()
     
     # 2. Vista Previa de Datos
-    st.subheader(f"Vista Previa: {report_type}")
+    st.markdown("<br>", unsafe_allow_html=True)
+    section_header(f"Vista Previa: {report_type}")
     df = get_report_data(report_type, start_date, end_date)
     
     if df.empty:
-        st.warning("No hay datos para el rango de fechas seleccionado.")
+        st.warning("No se encontraron registros para los parámetros especificados.")
         return
         
-    st.dataframe(df.head(10), use_container_width=True)
-    st.caption(f"Total de registros encontrados: {len(df)}")
+    card_container_begin()
+    render_styled_table(df.head(10))
+    st.markdown(f"<div style='font-size: 12px; color: #94A3B8; text-align: right; margin-top: 8px;'>Total de registros consolidados: {len(df)}</div>", unsafe_allow_html=True)
+    card_container_end()
     
     # Gráfico en vivo
     fig = generate_dynamic_plot(df, report_type)
     if fig:
+        card_container_begin()
         st.plotly_chart(fig, use_container_width=True)
+        card_container_end()
         
     # 3. Generación y Descarga
-    st.divider()
     summary_text = f"Reporte filtrado desde {start_date} hasta {end_date}. Se encontraron {len(df)} registros relevantes. Datos generados bajo la cuenta de {user['username']}."
     
-    if st.button(f"⚙️ Generar y Descargar Reporte en {export_format.split()[0]}", type="primary"):
+    st.markdown("<div style='margin-top: 24px;'></div>", unsafe_allow_html=True)
+    if st.button(f"Generar y Exportar Documento", type="primary", use_container_width=True):
         with st.spinner("Procesando reporte profesional..."):
             try:
                 # Generar imagen del gráfico
@@ -113,8 +131,7 @@ def render_reports():
                     except Exception:
                         img_path = None
                 
-                # Enrutar al generador correcto
-                title = f"Reporte de {report_type}"
+                title = f"Reporte: {report_type}"
                 if "PDF" in export_format:
                     file_bytes = generate_pdf(title, summary_text, df, img_path)
                     mime = "application/pdf"
@@ -128,19 +145,16 @@ def render_reports():
                     mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     ext = "xlsx"
                     
-                # Registrar auditoría de exportación
                 log_action(user["id"], "EXPORT_REPORT", details=f"Exportó {report_type} en formato {ext}")
                 
-                # Limpiar imagen temporal
                 if img_path and os.path.exists(img_path):
                     os.remove(img_path)
                 
-                # Entregar archivo
                 file_name = f"Reporte_{report_type.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.{ext}"
                 
-                st.success("✅ ¡Reporte generado exitosamente!")
+                st.success("✅ Documento generado exitosamente.")
                 st.download_button(
-                    label=f"⬇️ Descargar {file_name}",
+                    label=f"⬇️ Descargar Archivo Seguro",
                     data=file_bytes,
                     file_name=file_name,
                     mime=mime

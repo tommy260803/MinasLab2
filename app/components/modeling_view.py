@@ -10,6 +10,10 @@ import time
 from datetime import datetime
 from core.audit_logger import log_action
 from core.permissions import require_permission
+from app.components.ui_styles import (
+    page_header, section_header, render_styled_table, render_kpi_card,
+    card_container_begin, card_container_end
+)
 
 def get_models_status():
     """Verifica qué modelos están entrenados y disponibles."""
@@ -93,8 +97,7 @@ def render_modeling():
         log_action(user["id"], "VIEW_MODELING", details="Acceso al Motor de IA (Fase 4: Modelado)")
         st.session_state["modeling_loaded_log"] = True
 
-    st.markdown("## 🧠 Motor de Inteligencia Artificial")
-    st.markdown("*Fase 4 de CRISP-DM: Modelado y Entrenamiento de Algoritmos*")
+    page_header("Motor de Inteligencia Artificial", "Entrenamiento de algoritmos predictivos (CRISP-DM Fase 4)")
     
     models_status = get_models_status()
     metadata = get_training_metadata()
@@ -103,36 +106,33 @@ def render_modeling():
     
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("Modelos Entrenados", f"{trained_count}/{total_models}")
+        render_kpi_card("Modelos Entrenados", f"{trained_count}/{total_models}", "success" if trained_count == total_models else "warning", "Progreso del pipeline", "🧠")
     with col2:
-        if metadata:
-            st.metric("Features Generadas", metadata.get('features', []).__len__())
-        else:
-            st.metric("Features Generadas", "N/A")
+        feats = len(metadata.get('features', [])) if metadata else 0
+        render_kpi_card("Features Generadas", str(feats) if metadata else "N/A", "neutral", "Variables derivadas", "✨")
     with col3:
-        if metadata:
-            st.metric("Filas de Entrenamiento", f"{metadata.get('rows_train', 0):,}")
-        else:
-            st.metric("Filas de Entrenamiento", "N/A")
+        rows = metadata.get('rows_train', 0) if metadata else 0
+        render_kpi_card("Filas de Train", f"{rows:,}" if metadata else "N/A", "neutral", "Volumen de datos", "💾")
     with col4:
         if metadata:
             balance = metadata.get('class_balance_train', {})
             pos_pct = balance.get('1', 0) * 100
-            st.metric("Clase Positiva (Falla)", f"{pos_pct:.1f}%")
+            render_kpi_card("Desbalance Clase Falla", f"{pos_pct:.1f}%", "warning", "Requiere compensación", "⚖️")
         else:
-            st.metric("Clase Positiva (Falla)", "N/A")
+            render_kpi_card("Clase Positiva", "N/A", "neutral", None, "⚖️")
     
     st.divider()
     
     tab1, tab2, tab3, tab4 = st.tabs([
         "📊 Estado de Modelos",
         "🔬 Detalle de Algoritmos",
-        "⚙️ Entrenamiento",
-        "📈 Arquitectura CRISP-DM"
+        "⚙️ Ejecutar Pipeline",
+        "📈 Arquitectura"
     ])
     
     with tab1:
-        st.subheader("Estado de los Modelos en Disco")
+        st.markdown("<br>", unsafe_allow_html=True)
+        section_header("Estado de los Modelos en Disco")
         
         status_data = []
         for name, info in models_status.items():
@@ -146,19 +146,24 @@ def render_modeling():
             })
         
         df_status = pd.DataFrame(status_data)
-        st.dataframe(df_status, use_container_width=True, hide_index=True)
+        
+        card_container_begin()
+        render_styled_table(df_status)
+        card_container_end()
         
         if trained_count == 0:
-            st.warning("⚠️ No hay modelos entrenados. Ve a la pestaña 'Entrenamiento' para ejecutar el pipeline.")
+            st.warning("⚠️ No hay modelos entrenados. Ve a la pestaña 'Ejecutar Pipeline' para compilar la inteligencia.")
         elif trained_count < total_models:
             st.info(f"ℹ️ Hay {total_models - trained_count} modelo(s) sin entrenar. Considera ejecutar el pipeline completo.")
         else:
             st.success(f"✅ Todos los modelos están entrenados y disponibles.")
         
         if metadata:
-            st.markdown("### 📋 Metadatos del Último Entrenamiento")
+            st.markdown("### 📋 Metadatos del Dataset Procesado")
+            card_container_begin()
             col_a, col_b = st.columns(2)
             with col_a:
+                st.markdown("**Particiones:**")
                 st.json({
                     'target': metadata.get('target'),
                     'rows_train': metadata.get('rows_train'),
@@ -166,13 +171,16 @@ def render_modeling():
                     'rows_test': metadata.get('rows_test')
                 })
             with col_b:
+                st.markdown("**Ingeniería de Características:**")
                 st.json({
                     'class_balance': metadata.get('class_balance_train'),
                     'num_features': len(metadata.get('features', []))
                 })
+            card_container_end()
     
     with tab2:
-        st.subheader("Detalle de Algoritmos Implementados")
+        st.markdown("<br>", unsafe_allow_html=True)
+        section_header("Detalle Teórico de Algoritmos Implementados")
         
         algo_details = get_algorithm_details()
         
@@ -180,47 +188,51 @@ def render_modeling():
             info = models_status[name]
             with st.expander(f"{'✅' if info['trained'] else '❌'} **{name}** — {info['type']}", expanded=False):
                 st.markdown(f"**Descripción:** {details['description']}")
-                st.code(f"Hiperparámetros: {details['params']}", language=None)
+                st.code(f"Hiperparámetros base: {details['params']}", language="python")
                 
                 col_p, col_c = st.columns(2)
                 with col_p:
-                    st.markdown("**Ventajas:**")
+                    st.markdown("<span style='color:#00C853; font-weight:bold;'>Ventajas Competitivas:</span>", unsafe_allow_html=True)
                     for pro in details['pros']:
                         st.markdown(f"- ✅ {pro}")
                 with col_c:
-                    st.markdown("**Desventajas:**")
+                    st.markdown("<span style='color:#FFAB00; font-weight:bold;'>Limitaciones Técnicas:</span>", unsafe_allow_html=True)
                     for con in details['cons']:
                         st.markdown(f"- ⚠️ {con}")
     
     with tab3:
-        st.subheader("Ejecutar Pipeline de Entrenamiento")
+        st.markdown("<br>", unsafe_allow_html=True)
+        section_header("Ejecución del Pipeline de Entrenamiento")
         
+        card_container_begin()
         st.markdown("""
-        Esta acción ejecuta la **Fase 4 de CRISP-DM** completa:
-        1. Carga los datos preparados de la Fase 3
-        2. Entrena los 3 algoritmos tradicionales (RF, XGBoost, SVM)
-        3. Entrena los 2 algoritmos híbridos (CNN-LSTM, LSTM-AE+RF)
-        4. Serializa todos los modelos en `data/models/`
+        Esta acción ejecuta la **Fase 4 de CRISP-DM** de forma automatizada:
+        1. Carga los datos preparados (tensores y dataframes) de la Fase 3.
+        2. Entrena los 3 algoritmos tradicionales (RF, XGBoost, SVM).
+        3. Entrena los 2 algoritmos híbridos profundos (CNN-LSTM, LSTM-AE+RF).
+        4. Serializa todos los modelos en disco para inferencia de baja latencia.
         """)
         
         if trained_count > 0:
-            st.warning("⚠️ **Atención:** Esto reentrenará TODOS los modelos existentes. Los modelos actuales serán sobrescritos.")
+            st.warning("⚠️ **Atención:** Esto reentrenará TODOS los modelos existentes. Las métricas previas se sobreescribirán.")
         
         if not metadata:
-            st.error("❌ No se encontraron datos preparados. Debes ejecutar primero la Fase 3 (`python ml/phase3_data_preparation.py`).")
+            st.error("❌ No se encontraron datos preparados. Debes ejecutar primero la Fase 3 (Data Preparation).")
         else:
-            st.success(f"✅ Datos preparados disponibles: {metadata.get('rows_train', 0):,} filas de entrenamiento, {len(metadata.get('features', []))} features.")
+            st.success(f"✅ Datos listos en memoria compartida: {metadata.get('rows_train', 0):,} instancias vectorizadas.")
             
-            if st.button("🚀 Ejecutar Entrenamiento Completo", type="primary", use_container_width=True):
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("🚀 Lanzar Pipeline de Entrenamiento Completo", type="primary", use_container_width=True):
                 log_action(user["id"], "RUN_TRAINING", details="Inicio del pipeline de entrenamiento Fase 4")
                 
+                st.markdown("<br>", unsafe_allow_html=True)
                 progress_bar = st.progress(0)
                 status_text = st.empty()
                 
                 try:
                     from ml.phase4_modeling import run_phase4
                     
-                    status_text.text("🧠 Iniciando Fase 4: Modelado...")
+                    status_text.markdown("**🧠 Inicializando hiperparámetros y allocando memoria...**")
                     progress_bar.progress(10)
                     
                     start_time = time.time()
@@ -236,26 +248,28 @@ def render_modeling():
                     elapsed = time.time() - start_time
                     
                     progress_bar.progress(100)
-                    status_text.text("✅ Entrenamiento completado!")
+                    status_text.markdown("**✅ Pipeline completado satisfactoriamente.**")
                     
                     st.success(f"🎉 **Entrenamiento completado en {elapsed:.1f} segundos.**")
                     
-                    with st.expander("📋 Salida del Pipeline (Log)", expanded=False):
-                        st.code(training_output, language=None)
+                    with st.expander("📋 Ver Log de Sistema de la Corrida", expanded=False):
+                        st.code(training_output, language="shell")
                     
                     log_action(user["id"], "TRAINING_COMPLETED", details=f"Pipeline Fase 4 completado en {elapsed:.1f}s")
                     
+                    time.sleep(2)
                     st.rerun()
                     
                 except Exception as e:
                     progress_bar.progress(0)
-                    status_text.text("❌ Error en el entrenamiento")
-                    st.error(f"Error durante el entrenamiento: {e}")
-                    st.exception(e)
+                    status_text.error("❌ Excepción capturada durante el entrenamiento.")
+                    st.error(f"Error interno: {e}")
                     log_action(user["id"], "TRAINING_FAILED", details=f"Error: {str(e)[:200]}")
+        card_container_end()
     
     with tab4:
-        st.subheader("Flujo CRISP-DM: Motor de IA")
+        st.markdown("<br>", unsafe_allow_html=True)
+        section_header("Arquitectura Lógica CRISP-DM")
         
         phases = [
             {"name": "Fase 1: Business Understanding", "status": "Completada", "color": "green", "desc": "Definición del problema: mantenimiento predictivo para equipos de carguío minero. Objetivos: reducir MTTR ≥20%, aumentar disponibilidad ≥5%."},
@@ -266,14 +280,18 @@ def render_modeling():
             {"name": "Fase 6: Deployment", "status": "Pendiente", "color": "orange", "desc": "Despliegue en producción: predicción individual en tiempo real, inferencia por lotes (CSV), monitoreo de historial de predicciones."}
         ]
         
+        card_container_begin()
         for phase in phases:
             color_map = {"green": "🟢", "blue": "🔵", "orange": "🟠", "red": "🔴"}
             icon = color_map.get(phase["color"], "⚪")
-            st.markdown(f"**{icon} {phase['name']}** — _{phase['status']}_")
-            st.caption(phase["desc"])
-            st.divider()
+            st.markdown(f"<div style='font-size: 15px; font-weight: 600; color: #E2E8F0; margin-bottom: 4px;'>{icon} {phase['name']} <span style='font-size: 12px; color: #94A3B8; font-weight: normal; margin-left: 8px;'>[{phase['status']}]</span></div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='font-size: 13px; color: #94A3B8; margin-bottom: 16px;'>{phase['desc']}</div>", unsafe_allow_html=True)
+            if phase != phases[-1]:
+                st.markdown("<hr style='border: none; border-top: 1px solid #2D3139; margin: 0 0 16px 0;'>", unsafe_allow_html=True)
+        card_container_end()
         
-        st.markdown("### 🏗️ Arquitectura del Motor IA")
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("### 🏗️ Arquitectura de Procesamiento (Topología)")
         st.markdown("""
         ```
         ┌─────────────────────────────────────────────────────┐

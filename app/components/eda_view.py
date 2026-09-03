@@ -6,6 +6,10 @@ from sqlalchemy import text
 from datetime import datetime, timedelta
 from core.db_manager import engine
 from core.audit_logger import log_action
+from app.components.ui_styles import (
+    page_header, section_header, render_styled_table,
+    card_container_begin, card_container_end
+)
 
 @st.cache_data(ttl=300)
 def load_filters_data():
@@ -38,40 +42,40 @@ def calculate_outliers_iqr(series):
 def render_eda():
     user = st.session_state["user"]
     
-    # 1. Verificación estricta de Roles (Solo Admin y Analista)
     if user["role_id"] not in [1, 4]:
         st.error("Acceso denegado: El módulo de Análisis Exploratorio (EDA) es exclusivo para Administradores y Analistas de Datos.")
         st.stop()
         
-    # Registro de auditoría
     if not st.session_state.get("eda_loaded_log"):
         log_action(user["id"], "VIEW_EDA", details="Acceso al módulo EDA (CRISP-DM Fase 2)")
         st.session_state["eda_loaded_log"] = True
 
-    st.markdown("## 🔬 Análisis Exploratorio de Datos (EDA)")
-    st.markdown("*Fase 2 de CRISP-DM: Comprensión de los Datos*")
+    page_header("Análisis Exploratorio de Datos", "Comprensión y diagnóstico de datos sensóricos")
     
     eq_df, sens_df = load_filters_data()
     if eq_df.empty:
         st.warning("No hay equipos en la base de datos.")
         return
         
-    st.sidebar.markdown("### 🔍 Filtros EDA")
-    eq_options = dict(zip(eq_df['name'] + " (" + eq_df['code'] + ")", eq_df['id']))
-    selected_eq_name = st.sidebar.selectbox("Seleccione un Equipo", list(eq_options.keys()), key='eda_eq')
-    selected_eq_id = eq_options[selected_eq_name]
-    
-    date_range = st.sidebar.date_input("Rango de Fechas", 
-                                       value=(datetime(2023, 10, 20), datetime(2023, 11, 20)), key='eda_dates')
-    if isinstance(date_range, tuple) and len(date_range) == 2:
-        start_date, end_date = date_range
-    else:
-        start_date, end_date = datetime(2023, 10, 20), datetime(2023, 11, 20)
-        
-    sensor_types = sens_df['sensor_type'].tolist()
-    selected_sensors = st.sidebar.multiselect("Tipos de Sensores", sensor_types, default=sensor_types, key='eda_sensors')
-    
-    show_outliers = st.sidebar.checkbox("Mostrar Outliers en Gráficas", value=True)
+    if "sidebar_filters" in st.session_state:
+        with st.session_state["sidebar_filters"]:
+            st.markdown('<div style="font-size: 11px; font-weight: 600; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; padding-left: 4px;">Parámetros de Análisis</div>', unsafe_allow_html=True)
+            
+            eq_options = dict(zip(eq_df['name'] + " (" + eq_df['code'] + ")", eq_df['id']))
+            selected_eq_name = st.selectbox("Seleccione un Equipo", list(eq_options.keys()), key='eda_eq')
+            selected_eq_id = eq_options[selected_eq_name]
+            
+            date_range = st.date_input("Rango de Fechas", 
+                                            value=(datetime(2023, 10, 20), datetime(2023, 11, 20)), key='eda_dates')
+            if isinstance(date_range, tuple) and len(date_range) == 2:
+                start_date, end_date = date_range
+            else:
+                start_date, end_date = datetime(2023, 10, 20), datetime(2023, 11, 20)
+                
+            sensor_types = sens_df['sensor_type'].tolist()
+            selected_sensors = st.multiselect("Tipos de Sensores", sensor_types, default=sensor_types, key='eda_sensors')
+            
+            show_outliers = st.checkbox("Mostrar Outliers en Gráficas", value=True)
     
     df = fetch_eda_data(selected_eq_id, start_date, end_date)
     
@@ -86,14 +90,13 @@ def render_eda():
         st.info("No hay datos para los sensores seleccionados.")
         return
         
-    # Formato Wide para correlaciones y estadísticas
     df_wide = df.pivot_table(index='reading_timestamp', columns='sensor_type', values='reading_value').reset_index()
     
-    st.markdown("---")
     tab1, tab2, tab3 = st.tabs(["📊 Estadísticas Descriptivas", "📉 Visualizaciones Interactivas", "🚨 Calidad de Datos"])
     
     with tab1:
-        st.subheader("Estadísticas Descriptivas Globales")
+        st.markdown("<br>", unsafe_allow_html=True)
+        section_header("Resumen Estadístico")
         desc_stats = []
         for col in df_wide.columns:
             if col != 'reading_timestamp':
@@ -102,20 +105,22 @@ def render_eda():
                     desc_stats.append({
                         'Sensor': col,
                         'Count': len(s),
-                        'Media': s.mean(),
-                        'Mediana': s.median(),
-                        'Desv. Est.': s.std(),
-                        'Mínimo': s.min(),
-                        'P25 (Q1)': s.quantile(0.25),
-                        'P75 (Q3)': s.quantile(0.75),
-                        'Máximo': s.max(),
-                        'Asimetría': s.skew() if len(s) > 2 else np.nan,
-                        'Curtosis': s.kurtosis() if len(s) > 3 else np.nan
+                        'Media': round(s.mean(), 3),
+                        'Mediana': round(s.median(), 3),
+                        'Desv. Est.': round(s.std(), 3),
+                        'Mínimo': round(s.min(), 3),
+                        'P25 (Q1)': round(s.quantile(0.25), 3),
+                        'P75 (Q3)': round(s.quantile(0.75), 3),
+                        'Máximo': round(s.max(), 3),
+                        'Asimetría': round(s.skew(), 3) if len(s) > 2 else None,
+                        'Curtosis': round(s.kurtosis(), 3) if len(s) > 3 else None
                     })
         stats_df = pd.DataFrame(desc_stats)
-        st.dataframe(stats_df.style.format(precision=3), use_container_width=True)
         
-        # Botón Exportar
+        card_container_begin()
+        render_styled_table(stats_df)
+        card_container_end()
+        
         csv = stats_df.to_csv(index=False).encode('utf-8')
         st.download_button(
             label="⬇️ Exportar Resumen a CSV",
@@ -126,9 +131,9 @@ def render_eda():
         )
 
     with tab2:
-        st.subheader("Análisis Visual")
+        st.markdown("<br>", unsafe_allow_html=True)
+        section_header("Diagnóstico Visual de Distribuciones")
         
-        # Filtrado opcional de outliers para gráficas
         plot_df = df.copy()
         if not show_outliers:
             for s_type in plot_df['sensor_type'].unique():
@@ -140,43 +145,60 @@ def render_eda():
 
         c1, c2 = st.columns(2)
         with c1:
+            card_container_begin()
             fig_hist = px.histogram(plot_df, x='reading_value', color='sensor_type', 
                                     barmode='overlay', title='Histograma de Distribución',
                                     marginal='violin')
+            fig_hist.update_layout(margin=dict(l=0, r=0, t=40, b=0))
             st.plotly_chart(fig_hist, use_container_width=True)
+            card_container_end()
         with c2:
+            card_container_begin()
             fig_box = px.box(plot_df, x='sensor_type', y='reading_value', color='sensor_type',
                              title='Boxplots (Detección de Outliers)')
+            fig_box.update_layout(margin=dict(l=0, r=0, t=40, b=0))
             st.plotly_chart(fig_box, use_container_width=True)
+            card_container_end()
             
+        st.markdown("<br>", unsafe_allow_html=True)
+        section_header("Correlaciones y Series Temporales")
+        
         c3, c4 = st.columns(2)
         with c3:
+            card_container_begin()
             numeric_cols = df_wide.select_dtypes(include=[np.number]).columns
             corr_df = df_wide[numeric_cols].corr()
             fig_corr = px.imshow(corr_df, text_auto='.2f', aspect="auto", 
-                                 color_continuous_scale='RdBu_r', title='Heatmap de Correlación (Pearson)')
+                                 color_continuous_scale='RdBu_r', title='Heatmap de Correlación')
+            fig_corr.update_layout(margin=dict(l=0, r=0, t=40, b=0))
             st.plotly_chart(fig_corr, use_container_width=True)
+            card_container_end()
         with c4:
+            card_container_begin()
             sensors_avail = df_wide.drop(columns=['reading_timestamp']).columns.tolist()
             if len(sensors_avail) >= 2:
                 fig_scatter = px.scatter(df_wide, x=sensors_avail[0], y=sensors_avail[1], 
-                                         title=f'Scatter: {sensors_avail[0]} vs {sensors_avail[1]}')
+                                         title=f'Dispersión: {sensors_avail[0]} vs {sensors_avail[1]}')
+                fig_scatter.update_layout(margin=dict(l=0, r=0, t=40, b=0))
                 st.plotly_chart(fig_scatter, use_container_width=True)
             else:
-                st.info("Seleccione al menos 2 tipos de sensores para ver el Scatter Plot de correlación.")
+                st.info("Seleccione al menos 2 tipos de sensores para ver la dispersión.")
+            card_container_end()
 
-        st.markdown("#### Series Temporales (Zoom Interactivo)")
+        card_container_begin()
         fig_ts = px.line(plot_df, x='reading_timestamp', y='reading_value', color='sensor_type', facet_row='sensor_type')
-        fig_ts.update_yaxes(matches=None) # Escalas independientes para cada sensor
+        fig_ts.update_yaxes(matches=None)
+        fig_ts.update_layout(title="Evolución Histórica Multivariable", margin=dict(l=0, r=0, t=40, b=0), height=500)
         st.plotly_chart(fig_ts, use_container_width=True)
+        card_container_end()
         
-        # Conteo de Alertas
         with engine.connect() as conn:
             alertas = pd.read_sql("SELECT COUNT(*) as c FROM ai_predictions WHERE equipment_id = %s", conn, params=(selected_eq_id,)).iloc[0]['c']
-            st.info(f"**Total histórico de predicciones (Alertas de IA)** evaluadas para este equipo: {alertas}")
+            st.info(f"**Volumen histórico de predicciones analizadas (IA):** {alertas} registros evaluados.")
 
     with tab3:
-        st.subheader("Auditoría y Calidad de Datos")
+        st.markdown("<br>", unsafe_allow_html=True)
+        section_header("Auditoría de Integridad")
         
         dq_results = []
         for col in df_wide.columns:
@@ -200,18 +222,23 @@ def render_eda():
                 })
         
         dq_df = pd.DataFrame(dq_results)
-        st.table(dq_df)
         
+        card_container_begin()
+        render_styled_table(dq_df)
+        card_container_end()
+        
+        card_container_begin()
         duplicados = df_wide.duplicated(subset=['reading_timestamp']).sum()
         if duplicados > 0:
-            st.warning(f"**Registros duplicados por timestamp:** {duplicados}")
+            st.warning(f"**Alerta de Integridad:** Se detectaron {duplicados} registros duplicados por timestamp.")
         else:
-            st.success("**Registros duplicados por timestamp:** 0")
-        
-        st.markdown("### 📋 Reporte de Calidad y Sugerencias")
+            st.success("**Verificación de Integridad:** No existen registros duplicados. Consistencia temporal validada.")
+            
+        st.markdown("### Diagnóstico y Recomendaciones Técnicas")
         if any(dq_df['Nulos'] > 0):
-            st.error("⚠️ Se han detectado valores nulos. \n\n**Recomendación Fase 3 (Data Prep):** Aplicar técnicas de imputación (media/mediana) o forward-fill (ffill) dado que son series temporales.")
+            st.error("⚠️ Se han detectado valores nulos. \n\n**Recomendación Fase 3 (Data Prep):** Aplicar técnicas de imputación (media/mediana) o interpolación (forward-fill).")
         elif any(dq_df['Outliers (Z>3)'] > 0):
-            st.warning("⚠️ Hay presencia de outliers estadísticos (Z-score > 3). \n\n**Recomendación Fase 3 (Data Prep):** Investigar si son eventos reales (fallas) o errores de los sensores. Evaluar usar *Winsorization* o modelos robustos (Tree-based).")
+            st.warning("⚠️ Hay presencia de outliers estadísticos (Z-score > 3). \n\n**Recomendación Fase 3 (Data Prep):** Investigar anomalías físicas o errores de telemetría. Evaluar uso de modelos robustos (Tree-based).")
         else:
-            st.success("✅ La calidad de datos de esta muestra es óptima. Se puede proceder con la extracción de características (Feature Engineering).")
+            st.success("✅ La calidad de datos de esta muestra es óptima. Apta para procesamiento en el Motor IA.")
+        card_container_end()

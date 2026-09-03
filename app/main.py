@@ -6,23 +6,34 @@ import streamlit as st
 from core.auth_service import authenticate_user
 from core.permissions import get_role_permissions, require_permission
 from core.audit_logger import log_action
+from app.components.ui_styles import (
+    inject_enterprise_styles, apply_enterprise_plotly_theme,
+    render_sidebar_header, render_user_profile, page_header,
+    card_container_begin, card_container_end
+)
 
 # Configuración de página
-st.set_page_config(page_title="App Mantenimiento Predictivo", page_icon="⚙️", layout="wide")
+st.set_page_config(page_title="Mantenimiento Predictivo", page_icon="⚙️", layout="wide")
+
+# Inyectar CSS y temas
+inject_enterprise_styles()
+apply_enterprise_plotly_theme()
 
 def render_login_page():
     """Renderiza la página de inicio de sesión."""
-    st.title("⚙️ Mantenimiento Predictivo Minero")
-    st.markdown("### Acceso al Sistema")
+    st.markdown("<br><br><br>", unsafe_allow_html=True)
     
-    # Centrar el formulario de login visualmente
-    col1, col2, col3 = st.columns([1, 2, 1])
+    col1, col2, col3 = st.columns([1, 1.2, 1])
     
     with col2:
+        card_container_begin()
+        st.markdown("<h2 style='text-align: center; margin-bottom: 8px;'>Plataforma Predictiva</h2>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; color: #94A3B8; margin-bottom: 24px;'>Acceso Corporativo</p>", unsafe_allow_html=True)
+        
         with st.form("login_form", clear_on_submit=True):
-            st.markdown("Por favor ingrese sus credenciales para continuar.")
-            username = st.text_input("Usuario", placeholder="ej. admin_juan")
+            username = st.text_input("Usuario", placeholder="Ingrese su usuario")
             password = st.text_input("Contraseña", type="password", placeholder="••••••••")
+            st.markdown("<br>", unsafe_allow_html=True)
             submit_btn = st.form_submit_button("Iniciar Sesión", use_container_width=True)
             
             if submit_btn:
@@ -34,85 +45,109 @@ def render_login_page():
                     
                     if success:
                         token, user_data = data
-                        # NUNCA guardamos el password en session_state, solo el token y metadata
                         st.session_state["token"] = token
                         st.session_state["user"] = user_data
                         st.session_state["permissions"] = get_role_permissions(user_data["role_id"])
-                        
-                        # Registro de auditoría
-                        log_action(
-                            user_id=user_data["id"], 
-                            action="LOGIN_SUCCESS", 
-                            details=f"Login exitoso para el usuario {username}"
-                        )
+                        log_action(user_data["id"], "LOGIN_SUCCESS", f"Login exitoso: {username}")
                         st.rerun()
                     else:
                         st.error(f"❌ {msg}")
-                        # Registrar intento fallido
-                        log_action(
-                            user_id=None, 
-                            action="LOGIN_FAILED", 
-                            details=f"Fallo de autenticación para username: {username}"
-                        )
+                        log_action(None, "LOGIN_FAILED", f"Fallo de autenticación: {username}")
+        card_container_end()
 
 def render_main_app():
-    """Renderiza la aplicación principal y su navegación una vez autenticado."""
+    """Renderiza la aplicación principal y su navegación."""
     user = st.session_state["user"]
     
+    # Mapeo de roles para el frontend
+    roles = {1: "Administrador", 2: "Operador", 3: "Invitado", 4: "Analista"}
+    role_name = roles.get(user["role_id"], "Usuario")
+    
     with st.sidebar:
-        st.markdown(f"### 👤 Hola, **{user['username']}**")
-        st.markdown(f"*Rol ID: {user['role_id']}*")
-        st.divider()
+        # 1. Identidad del sistema / usuario
+        render_sidebar_header("MINER-AI PRO")
+        render_user_profile(user['username'], role_name)
         
-        # Menú de Navegación Dinámico por Roles
-        menu_options = ["Dashboard Principal"]
-        if user["role_id"] in [1, 4]:  # Admin y Analista
-            menu_options.append("EDA (Análisis Exploratorio)")
-            menu_options.append("Motor de IA (Fase 4: Modelado)")
-            menu_options.append("Fase 5: Evaluación de Modelos")
-            menu_options.append("Fase 6: Despliegue (Producción)")
-            menu_options.append("Reportes Profesionales")
+        # 2. Navegación principal
+        st.markdown('<div style="font-size: 11px; font-weight: 600; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; padding-left: 4px;">Navegación</div>', unsafe_allow_html=True)
+        
+        menu_options = {
+            "dashboard": {"icon": "📊", "label": "Dashboard Principal"},
+            "eda": {"icon": "🔬", "label": "Exploración de Datos"},
+            "modeling": {"icon": "⚙️", "label": "Motor IA (Fase 4)"},
+            "eval": {"icon": "🧠", "label": "Evaluación de Modelos"},
+            "deploy": {"icon": "🚀", "label": "Despliegue Producción"},
+            "reports": {"icon": "📑", "label": "Reportes Oficiales"}
+        }
+        
+        # Filtrar opciones según rol
+        available_keys = ["dashboard"]
+        if user["role_id"] in [1, 4]:
+            available_keys.extend(["eda", "modeling", "eval", "deploy", "reports"])
             
-        selection = st.radio("Navegación", menu_options)
-        st.divider()
+        # Estado actual de navegación
+        if "current_page" not in st.session_state:
+            st.session_state["current_page"] = "dashboard"
+            
+        st.markdown('<div class="nav-button-container">', unsafe_allow_html=True)
+        for key in available_keys:
+            opt = menu_options[key]
+            # Usar data-active en CSS si es posible, o marcadores visuales:
+            is_active = st.session_state["current_page"] == key
+            prefix = "🔹 " if is_active else "  "
+            
+            # En Streamlit los st.button nativos no soportan atributos custom directamente, 
+            # así que simularemos el active state alterando el label o dependiendo del CSS global.
+            label = f"{prefix}{opt['icon']}  {opt['label']}"
+            
+            if st.button(label, key=f"nav_{key}", use_container_width=True):
+                st.session_state["current_page"] = key
+                st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
         
-        # Logout
-        if st.button("🚪 Cerrar Sesión", use_container_width=True):
-            log_action(user["id"], "LOGOUT", details="Cierre de sesión manual")
+        # 3. Separador para filtros (los filtros se inyectarán aquí por las vistas individuales)
+        st.markdown("<hr style='border: none; border-top: 1px solid #2D3139; margin: 16px 0;'>", unsafe_allow_html=True)
+        
+        # Reservamos un contenedor vacío para que las vistas puedan inyectar filtros
+        filters_container = st.container()
+        
+        # 5. Acciones secundarias
+        st.markdown("<div style='flex-grow: 1; min-height: 50px;'></div>", unsafe_allow_html=True)
+        if st.button("Cerrar Sesión", use_container_width=True):
+            log_action(user["id"], "LOGOUT", "Cierre de sesión manual")
             st.session_state.clear()
             st.rerun()
 
-    if selection == "Dashboard Principal":
-        # Panel Principal protegido con RBAC
+    # Inyectamos el filters_container en session_state para que las vistas lo usen
+    st.session_state["sidebar_filters"] = filters_container
+
+    # Ruteo basado en current_page
+    selection = st.session_state["current_page"]
+    
+    if selection == "dashboard":
         try:
             require_permission("view_dashboard")
             from app.components.dashboard_view import render_dashboard
             render_dashboard()
         except st.runtime.scriptrunner.StopException:
             pass
-            
-    elif selection == "EDA (Análisis Exploratorio)":
+    elif selection == "eda":
         from app.components.eda_view import render_eda
         render_eda()
-        
-    elif selection == "Motor de IA (Fase 4: Modelado)":
+    elif selection == "modeling":
         from app.components.modeling_view import render_modeling
         render_modeling()
-        
-    elif selection == "Fase 5: Evaluación de Modelos":
+    elif selection == "eval":
         from app.components.evaluation_view import render_evaluation
         render_evaluation()
-        
-    elif selection == "Fase 6: Despliegue (Producción)":
+    elif selection == "deploy":
         from app.components.deployment_view import render_deployment
         render_deployment()
-        
-    elif selection == "Reportes Profesionales":
+    elif selection == "reports":
         from app.components.reports_view import render_reports
         render_reports()
 
 if __name__ == "__main__":
-    # Ruteo principal basado en el estado de la sesión
     if "token" not in st.session_state:
         render_login_page()
     else:

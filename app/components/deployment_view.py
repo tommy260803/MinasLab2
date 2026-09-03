@@ -13,6 +13,10 @@ from core.audit_logger import log_action
 from core.permissions import require_permission
 import json
 from sklearn.impute import SimpleImputer
+from app.components.ui_styles import (
+    page_header, section_header, render_styled_table,
+    card_container_begin, card_container_end
+)
 
 def load_artifacts():
     """Carga el modelo ganador, el scaler y los metadatos."""
@@ -74,7 +78,6 @@ def build_feature_vector(meta, base_values):
     """Reconstruye el vector de características exacto usado en entrenamiento."""
     input_dict = {}
     for f in meta['features']:
-        # Asignar el valor base correspondiente al sensor
         val = 0.0
         if 'TEMPERATURA' in f: val = base_values['temp']
         elif 'PRESION' in f: val = base_values['pres']
@@ -82,11 +85,10 @@ def build_feature_vector(meta, base_values):
         elif 'RPM' in f: val = base_values['rpm']
         elif 'NIVEL_ACEITE' in f: val = base_values['oil']
         
-        # Simular derivadas para inferencia en tiempo real (Steady State)
         if 'diff' in f:
-            input_dict[f] = 0.0 # Asumimos sin cambio abrupto inmediato
+            input_dict[f] = 0.0
         else:
-            input_dict[f] = val # Medias móviles = valor actual
+            input_dict[f] = val
             
     return pd.DataFrame([input_dict], columns=meta['features'])
 
@@ -98,7 +100,7 @@ def render_deployment():
         log_action(user["id"], "VIEW_DEPLOYMENT", details="Acceso a la Fase 6: Despliegue en Producción")
         st.session_state["deploy_loaded_log"] = True
 
-    st.title("🚀 Fase 6: Despliegue y Predicción en Vivo")
+    page_header("Despliegue y Predicción en Vivo", "Entorno de Producción e Inferencia (Fase 6)")
     
     model, scaler, meta, model_name = load_artifacts()
     
@@ -107,124 +109,126 @@ def render_deployment():
         st.info("Para habilitar este módulo:\n1. Ve a la **Fase 3** y ejecuta el script de preparación.\n2. Ve a la **Fase 4** y entrena los modelos.\n3. Asegúrate de que los archivos `.pkl` existan en `data/models/`.")
         return
 
-    st.success(f"✅ Modelo **{model_name}** (Ganador Fase 5) cargado y en línea. Latencia esperada: < 1.0s")
+    st.success(f"✅ Modelo Activo: **{model_name}** | Latencia Esperada: < 1.0s")
     
     tab1, tab2, tab3 = st.tabs([
         "⚡ Predicción Individual (Tiempo Real)", 
         "📁 Inferencia por Lotes (CSV)", 
-        "📈 Historial y Monitoreo"
+        "📈 Monitoreo de Desempeño"
     ])
     
     # ==========================================
     # TAB 1: Predicción Individual
     # ==========================================
     with tab1:
-        st.subheader("Simulador de Telemetría IoT")
+        st.markdown("<br>", unsafe_allow_html=True)
+        section_header("Simulador de Telemetría IoT")
         eq_df = get_equipment_list()
         
         col1, col2 = st.columns([1, 2])
         
         with col1:
-            st.markdown("**Parámetros del Equipo**")
+            card_container_begin()
+            st.markdown("<div style='font-size: 14px; font-weight: 600; color: #94A3B8; text-transform: uppercase; margin-bottom: 12px;'>Parámetros de Operación</div>", unsafe_allow_html=True)
             eq_options = dict(zip(eq_df['name'] + " (" + eq_df['code'] + ")", eq_df['id']))
-            selected_eq_name = st.selectbox("Equipo", list(eq_options.keys()))
+            selected_eq_name = st.selectbox("Equipo Asignado", list(eq_options.keys()))
             selected_eq_id = eq_options[selected_eq_name]
             
-            st.markdown("**Lecturas de Sensores**")
+            st.markdown("<hr style='border: none; border-top: 1px solid #2D3139; margin: 16px 0;'>", unsafe_allow_html=True)
             val_temp = st.slider("Temperatura (°C)", 0.0, 150.0, 85.0)
             val_pres = st.slider("Presión (PSI)", 0.0, 200.0, 100.0)
             val_vib = st.slider("Vibración (mm/s)", 0.0, 30.0, 5.0)
-            val_rpm = st.slider("RPM", 0.0, 3000.0, 1800.0)
-            val_oil = st.slider("Nivel de Aceite (%)", 0.0, 100.0, 80.0)
-            
-            predict_btn = st.button("🔍 Evaluar Riesgo (Predecir)", use_container_width=True, type="primary")
+            val_rpm = st.slider("Velocidad (RPM)", 0.0, 3000.0, 1800.0)
+            val_oil = st.slider("Nivel de Lubricante (%)", 0.0, 100.0, 80.0)
+            st.markdown("<br>", unsafe_allow_html=True)
+            predict_btn = st.button("Evaluar Riesgo Operativo", use_container_width=True, type="primary")
+            card_container_end()
             
         with col2:
             if predict_btn:
-                # 1. Medir tiempo y preprocesar
+                card_container_begin()
                 start_time = time.time()
                 
                 base_vals = {'temp': val_temp, 'pres': val_pres, 'vib': val_vib, 'rpm': val_rpm, 'oil': val_oil}
                 df_input = build_feature_vector(meta, base_vals)
                 
-                # Imputar NaN si existen (necesario para SVM)
                 imputer = SimpleImputer(strategy='median')
                 df_input = pd.DataFrame(imputer.fit_transform(df_input), columns=df_input.columns)
                 
-                # Escalar con exactamente el mismo scaler de la Fase 3
                 X_scaled = scaler.transform(df_input)
                 
-                # Predecir
                 proba = model.predict_proba(X_scaled)[0, 1]
                 pred_class = int(proba > 0.5)
                 
                 inference_time = time.time() - start_time
                 
-                # 2. Lógica de Negocio y Colores
                 if proba < 0.30:
-                    color = "#2ca02c" # Verde
-                    status = "NORMAL"
+                    color = "#00C853" 
+                    status = "ESTADO NORMAL"
                     details = "Parámetros operativos dentro de límites saludables."
                     pred_type = "NINGUNA"
                 elif proba < 0.70:
-                    color = "#ff7f0e" # Naranja
+                    color = "#FFAB00"
                     status = "ADVERTENCIA"
                     details = "Desviación detectada. Sugerencia: Programar revisión preventiva."
                     pred_type = "DESGASTE_TEMPRANO"
                 else:
-                    color = "#d62728" # Rojo
-                    status = "CRÍTICO (FALLA INMINENTE)"
-                    details = "Alta probabilidad de falla correctiva en < 24h. Detener equipo."
+                    color = "#D50000"
+                    status = "ESTADO CRÍTICO"
+                    details = "Alta probabilidad de falla. Detener equipo inmediatamente."
                     pred_type = "FALLA_CATASTROFICA"
                 
-                # 3. Mostrar Resultados (Gauge Chart)
                 fig = go.Figure(go.Indicator(
                     mode="gauge+number",
                     value=proba * 100,
-                    number={'suffix': "%", 'font': {'color': color}},
-                    title={'text': f"Riesgo de Falla: {status}", 'font': {'color': color}},
+                    number={'suffix': "%", 'font': {'color': color, 'size': 48}},
+                    title={'text': f"Riesgo de Falla Operativa", 'font': {'color': '#94A3B8', 'size': 14}},
                     gauge={
-                        'axis': {'range': [0, 100]},
-                        'bar': {'color': color},
+                        'axis': {'range': [0, 100], 'tickcolor': '#2D3139'},
+                        'bar': {'color': color, 'thickness': 0.3},
+                        'bgcolor': "rgba(0,0,0,0)",
+                        'borderwidth': 0,
                         'steps': [
-                            {'range': [0, 30], 'color': "rgba(44, 160, 44, 0.2)"},
-                            {'range': [30, 70], 'color': "rgba(255, 127, 14, 0.2)"},
-                            {'range': [70, 100], 'color': "rgba(214, 39, 40, 0.2)"}
+                            {'range': [0, 30], 'color': "rgba(0, 200, 83, 0.1)"},
+                            {'range': [30, 70], 'color': "rgba(255, 171, 0, 0.1)"},
+                            {'range': [70, 100], 'color': "rgba(213, 0, 0, 0.1)"}
                         ]
                     }
                 ))
+                fig.update_layout(height=300, margin=dict(l=20, r=20, t=50, b=20))
                 st.plotly_chart(fig, use_container_width=True)
                 
-                st.info(f"⏱️ **Tiempo de Inferencia:** {inference_time:.4f} segundos (Objetivo: < 1.0s cumplido)")
-                st.write(f"📝 **Diagnóstico IA:** {details}")
+                st.markdown(f"**Diagnóstico del Modelo:** <span style='color: {color}; font-weight: 600;'>{status}</span>", unsafe_allow_html=True)
+                st.write(f"📝 {details}")
+                st.markdown(f"<div style='font-size: 12px; color: #94A3B8; margin-top: 16px;'>⏱️ Tiempo de Inferencia: {inference_time:.4f}s</div>", unsafe_allow_html=True)
                 
-                # 4. Guardar en BD y Auditar
                 save_prediction_to_db(selected_eq_id, proba, pred_type, details)
                 log_action(user["id"], "RUN_PREDICTION", details=f"Inferencia manual eq={selected_eq_id}, prob={proba:.2f}")
+                card_container_end()
 
     # ==========================================
     # TAB 2: Predicción por Lotes (Batch)
     # ==========================================
     with tab2:
-        st.subheader("Carga de Datos CSV para Evaluación Masiva")
-        st.markdown("El archivo CSV debe contener exactamente las columnas de ingeniería de características generadas en la Fase 3.")
+        st.markdown("<br>", unsafe_allow_html=True)
+        section_header("Inferencia Masiva mediante Archivos")
+        st.markdown("<p style='color: #94A3B8; font-size: 14px;'>El archivo debe contener el vector de características (Feature Engineering) generado en la Fase 3.</p>", unsafe_allow_html=True)
         
-        uploaded_file = st.file_uploader("Sube un archivo de datos (ej. test_data.csv)", type=["csv"])
+        card_container_begin()
+        uploaded_file = st.file_uploader("Seleccione un archivo (.csv)", type=["csv"])
         if uploaded_file:
             df_batch = pd.read_csv(uploaded_file)
             
-            # Validar columnas
             missing_cols = [c for c in meta['features'] if c not in df_batch.columns]
             if missing_cols:
                 st.error(f"El CSV no tiene el formato correcto. Faltan {len(missing_cols)} columnas, incluyendo: {missing_cols[:3]}")
             else:
-                st.success("Formato validado correctamente.")
-                if st.button("Ejecutar Inferencia por Lotes", type="primary"):
-                    with st.spinner("Procesando..."):
+                st.success("Formato validado. Listo para inferencia.")
+                if st.button("Procesar Lote de Datos", type="primary"):
+                    with st.spinner("Procesando inferencia..."):
                         start_time = time.time()
                         
                         X_batch = df_batch[meta['features']]
-                        # Imputar NaN si existen
                         imputer = SimpleImputer(strategy='median')
                         X_batch = pd.DataFrame(imputer.fit_transform(X_batch), columns=X_batch.columns)
                         X_batch_scaled = scaler.transform(X_batch)
@@ -238,25 +242,28 @@ def render_deployment():
                         
                         st.success(f"Inferencia completada en {inf_time:.2f}s para {len(df_batch)} registros.")
                         
-                        st.dataframe(df_batch[['Riesgo_Predicho (%)', 'Alerta'] + meta['features'][:3]].head(50))
+                        render_styled_table(df_batch[['Riesgo_Predicho (%)', 'Alerta'] + meta['features'][:3]].head(50))
                         
-                        # Guardar batch en la BD de forma simplificada
-                        # Asignamos al equipo 1 si no viene en el CSV (MVP)
                         eq_col = 'equipment_id' if 'equipment_id' in df_batch.columns else None
-                        for idx, row in df_batch.head(50).iterrows(): # Limitamos a 50 inserts para no saturar BD
+                        for idx, row in df_batch.head(50).iterrows(): 
                             eq_id = row[eq_col] if eq_col else 1
                             save_prediction_to_db(eq_id, probas[idx], row['Alerta'], "Batch Prediction")
                             
                         log_action(user["id"], "RUN_BATCH_PREDICTION", details=f"Inferencia masiva de {len(df_batch)} filas")
-                        st.info("Nota: Se han guardado las primeras 50 predicciones en el historial para evitar sobrecarga.")
+                        st.info("Nota: Se han guardado las primeras 50 predicciones en el historial del sistema.")
+        card_container_end()
 
     # ==========================================
     # TAB 3: Historial y Monitoreo (Dashboard)
     # ==========================================
     with tab3:
-        st.subheader("Monitoreo de Predicciones Históricas")
-        if st.button("🔄 Actualizar Datos"):
-            pass
+        st.markdown("<br>", unsafe_allow_html=True)
+        section_header("Registro Histórico de Evaluaciones (Live)")
+        
+        col_btn, _ = st.columns([1, 4])
+        with col_btn:
+            if st.button("🔄 Refrescar Monitor", use_container_width=True):
+                pass
             
         with engine.connect() as conn:
             hist_df = pd.read_sql("""
@@ -270,18 +277,27 @@ def render_deployment():
         if not hist_df.empty:
             hist_df['failure_probability'] = hist_df['failure_probability'] * 100
             
-            c1, c2 = st.columns([2, 1])
+            c1, c2 = st.columns([6, 4])
             with c1:
+                card_container_begin()
                 fig_trend = px.line(hist_df, x='prediction_date', y='failure_probability', color='equipo',
-                                    title="Tendencia de Riesgo Reciente por Equipo",
+                                    title="Tendencia Operativa Continua",
                                     labels={'prediction_date': 'Fecha', 'failure_probability': 'Riesgo (%)'})
-                fig_trend.add_hline(y=70, line_dash="dash", line_color="red", annotation_text="Límite Crítico")
+                fig_trend.add_hline(y=70, line_dash="dash", line_color="#D50000", annotation_text="Límite Crítico")
+                fig_trend.update_layout(margin=dict(l=0, r=0, t=40, b=0))
                 st.plotly_chart(fig_trend, use_container_width=True)
+                card_container_end()
                 
             with c2:
-                fig_pie = px.pie(hist_df, names='predicted_failure_type', title="Distribución de Estados Previstos", hole=0.4)
+                card_container_begin()
+                fig_pie = px.pie(hist_df, names='predicted_failure_type', title="Distribución de Estados Previstos", hole=0.5, color_discrete_sequence=px.colors.sequential.Teal)
+                fig_pie.update_layout(margin=dict(l=0, r=0, t=40, b=0))
                 st.plotly_chart(fig_pie, use_container_width=True)
+                card_container_end()
                 
-            st.dataframe(hist_df.style.format({'failure_probability': "{:.1f}%"}), use_container_width=True)
+            card_container_begin()
+            st.markdown("<div style='font-size: 14px; font-weight: 600; margin-bottom: 12px;'>Últimos 200 Registros de Inferencia</div>", unsafe_allow_html=True)
+            render_styled_table(hist_df)
+            card_container_end()
         else:
             st.info("No hay predicciones en el historial aún.")
