@@ -68,6 +68,7 @@ def render_main_app():
         menu_options = ["Dashboard Principal"]
         if user["role_id"] in [1, 4]:  # Admin y Analista
             menu_options.append("EDA (Análisis Exploratorio)")
+            menu_options.append("Motor de IA (Fase 4: Modelado)")
             menu_options.append("Fase 5: Evaluación de Modelos")
             menu_options.append("Fase 6: Despliegue (Producción)")
             menu_options.append("Reportes Profesionales")
@@ -93,6 +94,10 @@ def render_main_app():
     elif selection == "EDA (Análisis Exploratorio)":
         from app.components.eda_view import render_eda
         render_eda()
+        
+    elif selection == "Motor de IA (Fase 4: Modelado)":
+        from app.components.modeling_view import render_modeling
+        render_modeling()
         
     elif selection == "Fase 5: Evaluación de Modelos":
         from app.components.evaluation_view import render_evaluation
