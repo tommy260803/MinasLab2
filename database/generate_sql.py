@@ -145,7 +145,7 @@ CREATE INDEX idx_maintenances_status ON maintenances(status);
 """
 
 # Bcrypt válido generado con coste 12 para 'password123'
-hash_pw = "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj2IK/3JGEA6"
+hash_pw = "$2b$12$9YPv/MP2W9v/LhokGMfUqOxU0fwgVAG6kjsd4jWBSjm1OT/zeemMq"
 
 seed_sql = f"""-- database/seed_data.sql
 -- Inserción de datos de prueba (Seed Data)
@@ -224,10 +224,13 @@ INSERT INTO maintenances (id, equipment_id, user_id, maintenance_type, start_dat
 (2, 2, 2, 'PREVENTIVO', '2023-02-15 08:00:00', '2023-02-15 16:00:00', 'COMPLETADO', 'Revisión de frenos y suspensión'),
 (3, 3, 2, 'PREDICTIVO', '2023-10-25 09:00:00', NULL, 'EN_PROGRESO', 'Alerta IA: Intervención para revisar motor por alta temperatura'),
 (4, 4, 2, 'PREVENTIVO', '2023-05-20 07:00:00', '2023-05-21 12:00:00', 'COMPLETADO', 'Mantenimiento semestral general'),
-(5, 5, 2, 'CORRECTIVO', '2023-08-14 10:00:00', '2023-08-16 15:00:00', 'COMPLETADO', 'Reemplazo de manguera hidráulica rota'),
-(6, 6, 2, 'CORRECTIVO', '2023-10-20 08:00:00', NULL, 'PROGRAMADO', 'Reemplazo de motor principal por falla catastrófica'),
+(5, 5, 2, 'CORRECTIVO', '2023-10-28 10:00:00', '2023-10-28 18:00:00', 'COMPLETADO', 'Reemplazo de manguera hidráulica rota'),
+(6, 6, 2, 'CORRECTIVO', '2023-10-30 08:00:00', NULL, 'PROGRAMADO', 'Reemplazo de motor principal por falla catastrófica'),
 (7, 1, 2, 'PREVENTIVO', '2023-06-10 08:00:00', '2023-06-10 18:00:00', 'COMPLETADO', 'Cambio de aceite de mitad de año'),
-(8, 2, 2, 'PREDICTIVO', '2023-07-05 09:00:00', '2023-07-06 14:00:00', 'COMPLETADO', 'Reemplazo de rodamiento preventivo sugerido por vibración');
+(8, 2, 2, 'PREDICTIVO', '2023-07-05 09:00:00', '2023-07-06 14:00:00', 'COMPLETADO', 'Reemplazo de rodamiento preventivo sugerido por vibración'),
+(9, 4, 2, 'CORRECTIVO', '2023-10-29 14:00:00', '2023-10-30 10:00:00', 'COMPLETADO', 'Falla en bomba hidráulica por desgaste de rodamientos'),
+(10, 3, 2, 'CORRECTIVO', '2023-10-31 09:00:00', NULL, 'EN_PROGRESO', 'Falla de motor por exceso de temperatura y RPM irregulares'),
+(11, 1, 2, 'CORRECTIVO', '2023-11-01 02:00:00', NULL, 'PROGRAMADO', 'Falla en sistema de frenos por desgaste');
 
 -- Generando 500+ lecturas de sensores
 """
@@ -267,7 +270,7 @@ for i in range(550):
 batch_size = 100
 for idx in range(0, len(values_sql), batch_size):
     batch = values_sql[idx:idx+batch_size]
-    seed_sql += "\\nINSERT INTO sensor_readings (sensor_id, reading_value, reading_timestamp) VALUES\\n" + ",\\n".join(batch) + ";\\n"
+    seed_sql += "\nINSERT INTO sensor_readings (sensor_id, reading_value, reading_timestamp) VALUES\n" + ",\n".join(batch) + ";\n"
 
 seed_sql += """
 -- Ajuste de secuencias
@@ -279,10 +282,12 @@ SELECT setval('sensors_id_seq', (SELECT MAX(id) FROM sensors));
 SELECT setval('maintenances_id_seq', (SELECT MAX(id) FROM maintenances));
 """
 
-with open(r'c:\Users\Anthony Garcia\LABORATORIO2_SOFTWARE\database\schema.sql', 'w', encoding='utf-8') as f:
+base_dir = os.path.dirname(os.path.abspath(__file__))
+
+with open(os.path.join(base_dir, 'schema.sql'), 'w', encoding='utf-8') as f:
     f.write(schema_sql)
 
-with open(r'c:\Users\Anthony Garcia\LABORATORIO2_SOFTWARE\database\seed_data.sql', 'w', encoding='utf-8') as f:
+with open(os.path.join(base_dir, 'seed_data.sql'), 'w', encoding='utf-8') as f:
     f.write(seed_sql)
 
 print("Archivos SQL generados exitosamente.")

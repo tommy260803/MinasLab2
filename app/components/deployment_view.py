@@ -12,6 +12,7 @@ from core.db_manager import engine
 from core.audit_logger import log_action
 from core.permissions import require_permission
 import json
+from sklearn.impute import SimpleImputer
 
 def load_artifacts():
     """Carga el modelo ganador, el scaler y los metadatos."""
@@ -20,14 +21,31 @@ def load_artifacts():
     data_dir = os.path.join(base_dir, 'data', 'processed')
     
     try:
-        # Por defecto, asumimos que el Random Forest fue el seleccionado en el MCDA
-        model = joblib.load(os.path.join(models_dir, 'random_forest.pkl'))
         scaler = joblib.load(os.path.join(models_dir, 'scaler.pkl'))
         with open(os.path.join(data_dir, 'metadata.json'), 'r') as f:
             meta = json.load(f)
-        return model, scaler, meta
+        
+        eval_path = os.path.join(data_dir, 'evaluation_results.pkl')
+        model_name = 'Random Forest'
+        if os.path.exists(eval_path):
+            eval_results = joblib.load(eval_path)
+            best_f1 = -1
+            for name, metrics in eval_results.get('metrics', {}).items():
+                if metrics.get('F1-Score', 0) > best_f1:
+                    best_f1 = metrics['F1-Score']
+                    model_name = name
+        
+        model_map = {
+            'Random Forest': 'random_forest.pkl',
+            'XGBoost': 'xgboost.pkl',
+            'SVM (RBF)': 'svm.pkl'
+        }
+        model_file = model_map.get(model_name, 'random_forest.pkl')
+        model = joblib.load(os.path.join(models_dir, model_file))
+        
+        return model, scaler, meta, model_name
     except Exception as e:
-        return None, None, None
+        return None, None, None, None
 
 def save_prediction_to_db(eq_id, prob, pred_type, details):
     """Persiste la predicción en PostgreSQL con trazabilidad."""
@@ -82,14 +100,14 @@ def render_deployment():
 
     st.title("🚀 Fase 6: Despliegue y Predicción en Vivo")
     
-    model, scaler, meta = load_artifacts()
+    model, scaler, meta, model_name = load_artifacts()
     
     if model is None or scaler is None:
         st.error("❌ **Modelo no encontrado en producción.**")
         st.info("Para habilitar este módulo:\n1. Ve a la **Fase 3** y ejecuta el script de preparación.\n2. Ve a la **Fase 4** y entrena los modelos.\n3. Asegúrate de que los archivos `.pkl` existan en `data/models/`.")
         return
 
-    st.success("✅ Modelo **Random Forest** (Ganador Fase 5) cargado y en línea. Latencia esperada: < 1.0s")
+    st.success(f"✅ Modelo **{model_name}** (Ganador Fase 5) cargado y en línea. Latencia esperada: < 1.0s")
     
     tab1, tab2, tab3 = st.tabs([
         "⚡ Predicción Individual (Tiempo Real)", 
@@ -128,6 +146,10 @@ def render_deployment():
                 
                 base_vals = {'temp': val_temp, 'pres': val_pres, 'vib': val_vib, 'rpm': val_rpm, 'oil': val_oil}
                 df_input = build_feature_vector(meta, base_vals)
+                
+                # Imputar NaN si existen (necesario para SVM)
+                imputer = SimpleImputer(strategy='median')
+                df_input = pd.DataFrame(imputer.fit_transform(df_input), columns=df_input.columns)
                 
                 # Escalar con exactamente el mismo scaler de la Fase 3
                 X_scaled = scaler.transform(df_input)
@@ -202,6 +224,9 @@ def render_deployment():
                         start_time = time.time()
                         
                         X_batch = df_batch[meta['features']]
+                        # Imputar NaN si existen
+                        imputer = SimpleImputer(strategy='median')
+                        X_batch = pd.DataFrame(imputer.fit_transform(X_batch), columns=X_batch.columns)
                         X_batch_scaled = scaler.transform(X_batch)
                         
                         probas = model.predict_proba(X_batch_scaled)[:, 1]

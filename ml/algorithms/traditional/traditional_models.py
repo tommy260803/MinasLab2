@@ -1,6 +1,8 @@
 import joblib
+import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
+from sklearn.impute import SimpleImputer
 import xgboost as xgb
 
 def train_random_forest(X_train, y_train, random_state=42):
@@ -53,6 +55,8 @@ def train_svm(X_train, y_train, random_state=42):
     para encontrar un hiperplano de separación óptimo para relaciones no lineales complejas.
     Se requiere `probability=True` para su integración en el Dashboard de Riesgos.
     """
+    imputer = SimpleImputer(strategy='median')
+    X_train_clean = imputer.fit_transform(X_train)
     model = SVC(
         kernel='rbf',
         C=1.0,
@@ -61,5 +65,5 @@ def train_svm(X_train, y_train, random_state=42):
         probability=True,
         random_state=random_state
     )
-    model.fit(X_train, y_train)
+    model.fit(X_train_clean, y_train)
     return model

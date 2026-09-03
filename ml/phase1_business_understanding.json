@@ -1,0 +1,18 @@
+{
+    "phase": "1 - Business Understanding",
+    "problem_statement": "El sistema actual experimenta fallas imprevistas en los equipos de carguío minero (camiones autónomos, palas hidráulicas, perforadoras). Estas fallas resultan en tiempos de inactividad prolongados, cuellos de botella en la extracción y altos costos operativos por reparaciones correctivas de emergencia.",
+    "business_objectives": {
+        "O1_reduce_mttr": "Reducir el Tiempo Medio de Reparación (MTTR) en ≥20% anticipando fallas.",
+        "O2_increase_availability": "Aumentar la disponibilidad de la flota en ≥5%.",
+        "O3_reduce_costs": "Reducir los costos de mantenimiento no planificado en ≥15% migrando al mantenimiento predictivo."
+    },
+    "model_success_criteria": {
+        "Precision": "≥ 85% (Minimizar falsos positivos para no sacar equipos de operación innecesariamente).",
+        "Sensibilidad (Recall)": "≥ 90% (Detectar la gran mayoría de fallas reales, prioridad de negocio).",
+        "F1-Score": "≥ 0.85 (Balance adecuado entre Precision y Recall).",
+        "AUC-ROC": "≥ 0.90 (Excelente capacidad de discriminación entre estado normal y falla).",
+        "AUC-PR": "≥ 0.85 (Manejo robusto de datos desbalanceados, típico en fallas).",
+        "Inference Time": "< 1 segundo (Permitir scoring casi en tiempo real desde los sensores IoT)."
+    },
+    "project_plan": "1. Consolidar telemetría de sensores y órdenes de trabajo (Semanas 1-2). 2. Desarrollo y validación del modelo predictivo (Semanas 3-5). 3. Despliegue e integración en dashboard de operaciones (Semana 6)."
+}

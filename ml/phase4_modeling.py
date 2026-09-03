@@ -1,9 +1,12 @@
 import pandas as pd
 import numpy as np
 import os
+import sys
 import joblib
 import json
 import warnings
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Suprimir advertencias menores de scikit-learn
 warnings.filterwarnings('ignore')

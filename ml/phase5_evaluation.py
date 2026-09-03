@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 from statsmodels.stats.contingency_tables import mcnemar
+from sklearn.impute import SimpleImputer
 from sklearn.metrics import (accuracy_score, precision_score, recall_score, 
                              f1_score, roc_auc_score, average_precision_score,
                              confusion_matrix, roc_curve, precision_recall_curve)
@@ -39,6 +40,13 @@ def run_evaluation_pipeline():
         for c in drop_cols:
             if c in X_train.columns: X_train.pop(c)
             if c in X_test.columns: X_test.pop(c)
+        
+        # Imputar NaN con mediana (necesario para SVM)
+        imputer = SimpleImputer(strategy='median')
+        X_train_imputed = pd.DataFrame(imputer.fit_transform(X_train), columns=X_train.columns, index=X_train.index)
+        X_test_imputed = pd.DataFrame(imputer.transform(X_test), columns=X_test.columns, index=X_test.index)
+        X_train = X_train_imputed
+        X_test = X_test_imputed
             
     except Exception as e:
         print(f"Error cargando datos: {e}")
@@ -95,13 +103,26 @@ def run_evaluation_pipeline():
         'Time Series Split': TimeSeriesSplit(n_splits=5) # Obligatorio para series de tiempo
     }
     
-    for name, model in models.items():
+    # Crear copias de modelos para CV (sin early_stopping para XGBoost)
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.svm import SVC
+    import xgboost as xgb
+    
+    cv_models = {
+        'Random Forest': RandomForestClassifier(n_estimators=150, max_depth=12, class_weight='balanced', random_state=42, n_jobs=-1),
+        'XGBoost': xgb.XGBClassifier(n_estimators=300, learning_rate=0.05, max_depth=6, random_state=42, eval_metric='auc', n_jobs=-1),
+        'SVM (RBF)': SVC(kernel='rbf', C=1.0, gamma='scale', class_weight='balanced', probability=True, random_state=42)
+    }
+    
+    for name, model in cv_models.items():
         results['cv'][name] = {}
         for cv_name, cv_splitter in cv_strategies.items():
-            # Usamos F1 como métrica robusta
             from sklearn.model_selection import cross_val_score
-            scores = cross_val_score(model, X_train, y_train, cv=cv_splitter, scoring='f1', n_jobs=-1)
-            results['cv'][name][cv_name] = {'mean': np.mean(scores), 'std': np.std(scores), 'folds': scores.tolist()}
+            try:
+                scores = cross_val_score(model, X_train, y_train, cv=cv_splitter, scoring='f1', n_jobs=-1, error_score='raise')
+            except Exception:
+                scores = cross_val_score(model, X_train, y_train, cv=cv_splitter, scoring='f1', n_jobs=-1, error_score=np.nan)
+            results['cv'][name][cv_name] = {'mean': float(np.nanmean(scores)), 'std': float(np.nanstd(scores)), 'folds': [float(x) for x in scores.tolist()]}
 
     # 4. Pruebas Estadísticas y Estabilidad
     print("[4/5] Realizando Pruebas Estadísticas y de Robustez (McNemar, T-Test, Bootstrap, Ruido)...")
