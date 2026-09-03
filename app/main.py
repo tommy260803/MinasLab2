@@ -65,6 +65,7 @@ def render_main_app():
         if user["role_id"] in [1, 4]:  # Admin y Analista
             menu_options.append("EDA (Análisis Exploratorio)")
             menu_options.append("Fase 5: Evaluación de Modelos")
+            menu_options.append("Fase 6: Despliegue (Producción)")
             
         selection = st.radio("Navegación", menu_options)
         st.divider()
@@ -91,6 +92,10 @@ def render_main_app():
     elif selection == "Fase 5: Evaluación de Modelos":
         from app.components.evaluation_view import render_evaluation
         render_evaluation()
+        
+    elif selection == "Fase 6: Despliegue (Producción)":
+        from app.components.deployment_view import render_deployment
+        render_deployment()
 
 if __name__ == "__main__":
     # Ruteo principal basado en el estado de la sesión
