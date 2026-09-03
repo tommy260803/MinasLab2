@@ -52,12 +52,20 @@ def render_login_page():
                         )
 
 def render_main_app():
-    """Renderiza la aplicación principal una vez autenticado."""
+    """Renderiza la aplicación principal y su navegación una vez autenticado."""
     user = st.session_state["user"]
     
     with st.sidebar:
         st.markdown(f"### 👤 Hola, **{user['username']}**")
         st.markdown(f"*Rol ID: {user['role_id']}*")
+        st.divider()
+        
+        # Menú de Navegación Dinámico por Roles
+        menu_options = ["Dashboard Principal"]
+        if user["role_id"] in [1, 4]:  # Admin y Analista
+            menu_options.append("EDA (Análisis Exploratorio)")
+            
+        selection = st.radio("Navegación", menu_options)
         st.divider()
         
         # Logout
@@ -66,20 +74,19 @@ def render_main_app():
             st.session_state.clear()
             st.rerun()
 
-    st.title("📊 Panel de Control (Dashboard)")
-    
-    # Panel Principal protegido con RBAC
-    try:
-        # Se verifica si tiene permiso para ver el dashboard
-        require_permission("view_dashboard")
-        
-        # Importamos e instanciamos el módulo del dashboard
-        from app.components.dashboard_view import render_dashboard
-        render_dashboard()
-                
-    except st.runtime.scriptrunner.StopException:
-        # StopException es lanzado por st.stop() en require_permission
-        pass
+    if selection == "Dashboard Principal":
+        # Panel Principal protegido con RBAC
+        try:
+            require_permission("view_dashboard")
+            from app.components.dashboard_view import render_dashboard
+            render_dashboard()
+        except st.runtime.scriptrunner.StopException:
+            pass
+            
+    elif selection == "EDA (Análisis Exploratorio)":
+        # Módulo EDA para análisis de datos
+        from app.components.eda_view import render_eda
+        render_eda()
 
 if __name__ == "__main__":
     # Ruteo principal basado en el estado de la sesión
