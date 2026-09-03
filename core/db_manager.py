@@ -24,8 +24,15 @@ def get_db_url():
                     host = config['database'].get('host', 'localhost')
                     port = config['database'].get('port', 5432)
                     user = config['database'].get('user', 'postgres')
-                    password = config['database'].get('password', '')
+                    password = config['database'].get('password', 'secret_password')
                     name = config['database'].get('name', 'predictive_maintenance_db')
+                    
+                    # Fix: Limpiar literales ${VAR} de YAML si no fueron sustituidos
+                    if str(port).startswith('${'): port = 5432
+                    if str(host).startswith('${'): host = 'localhost'
+                    if str(user).startswith('${'): user = 'postgres'
+                    if str(password).startswith('${'): password = 'secret_password'
+                    if str(name).startswith('${'): name = 'predictive_maintenance_db'
         except Exception:
             host, port, user, password, name = 'localhost', '5432', 'postgres', 'secret_password', 'predictive_maintenance_db'
             
