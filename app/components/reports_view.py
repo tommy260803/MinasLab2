@@ -23,7 +23,7 @@ def get_report_data(report_type, start_date, end_date):
         elif report_type == "Estado de Mantenimientos":
             query = f"""
                 SELECT e.name as Equipo, e.code as Codigo, m.maintenance_type as Tipo, m.start_date as Fecha_Inicio, 
-                       m.end_date as Fecha_Fin, m.cost as Costo, m.status as Estado
+                       m.end_date as Fecha_Fin, m.status as Estado
                 FROM maintenances m
                 JOIN equipments e ON m.equipment_id = e.id
                 WHERE m.start_date >= '{start_date}' AND m.start_date <= '{end_date} 23:59:59'
@@ -49,11 +49,11 @@ def generate_dynamic_plot(df, report_type):
     if df.empty: return None
     
     if report_type == "Auditoría de Accesos":
-        return px.pie(df, names='Accion', title='Distribución de Acciones en el Sistema', hole=0.3)
+        return px.pie(df, names='accion', title='Distribución de Acciones en el Sistema', hole=0.3)
     elif report_type == "Estado de Mantenimientos":
-        return px.bar(df, x='Equipo', y='Costo', color='Tipo', title='Costos de Mantenimiento por Equipo y Tipo')
+        return px.bar(df, x='equipo', color='tipo', title='Mantenimientos por Equipo y Tipo')
     elif report_type == "Historial de Predicciones AI":
-        return px.line(df, x='Fecha', y='Probabilidad_Riesgo', color='Equipo', title='Evolución del Riesgo de Falla')
+        return px.line(df, x='fecha', y='probabilidad_riesgo', color='equipo', title='Evolución del Riesgo de Falla')
     
     return None
 
@@ -103,15 +103,15 @@ def render_reports():
     if st.button(f"⚙️ Generar y Descargar Reporte en {export_format.split()[0]}", type="primary"):
         with st.spinner("Procesando reporte profesional..."):
             try:
-                # Si hay gráfico y es PDF/Word, tratar de guardarlo como imagen temporal
+                # Generar imagen del gráfico
                 img_path = None
                 if fig and "Excel" not in export_format:
                     try:
                         temp_dir = tempfile.gettempdir()
                         img_path = os.path.join(temp_dir, 'temp_plot.png')
                         fig.write_image(img_path, engine="kaleido")
-                    except Exception as e:
-                        img_path = None # Falla silenciosa si kaleido no está disponible
+                    except Exception:
+                        img_path = None
                 
                 # Enrutar al generador correcto
                 title = f"Reporte de {report_type}"
