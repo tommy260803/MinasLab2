@@ -74,6 +74,7 @@ def render_main_app():
         menu_options = {
             "dashboard": {"icon": "📊", "label": "Dashboard Principal"},
             "eda": {"icon": "🔬", "label": "Exploración de Datos"},
+            "phase3": {"icon": "📋", "label": "Fase 3: Preparación de Datos"},
             "modeling": {"icon": "⚙️", "label": "Motor IA (Fase 4)"},
             "eval": {"icon": "🧠", "label": "Evaluación de Modelos"},
             "deploy": {"icon": "🚀", "label": "Despliegue Producción"},
@@ -83,7 +84,7 @@ def render_main_app():
         # Filtrar opciones según rol
         available_keys = ["dashboard"]
         if user["role_id"] in [1, 4]:
-            available_keys.extend(["eda", "modeling", "eval", "deploy", "reports"])
+            available_keys.extend(["eda", "phase3", "modeling", "eval", "deploy", "reports"])
             
         # Estado actual de navegación
         if "current_page" not in st.session_state:
@@ -134,6 +135,9 @@ def render_main_app():
     elif selection == "eda":
         from app.components.eda_view import render_eda
         render_eda()
+    elif selection == "phase3":
+        from app.components.data_preparation_view import render_data_preparation
+        render_data_preparation()
     elif selection == "modeling":
         from app.components.modeling_view import render_modeling
         render_modeling()
